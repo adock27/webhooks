@@ -111,10 +111,20 @@
       .dot-off {
         color: #71767b;
       }
+      .range-info {
+        font-size: 0.85rem;
+        color: #71767b;
+        margin: 0.35rem 0 0;
+        line-height: 1.4;
+      }
     </style>
   </head>
   <body>
-    <h1>Adivina el número (1–100)</h1>
+    <h1>Adivina el número</h1>
+    <p id="rangeInfo" class="range-info">
+      Cada ronda usa un rango aleatorio (mínimo 100 entre el menor y el mayor). Únete para ver el de esta
+      partida.
+    </p>
     <p id="status">Desconectado</p>
     <div id="banner" role="status"></div>
 
@@ -150,7 +160,7 @@
         <strong>Jugadores:</strong> <span id="playerList">—</span>
       </p>
       <label for="guessN">Tu número</label>
-      <input type="number" id="guessN" min="1" max="100" step="1" />
+      <input type="number" id="guessN" min="1" max="100000" step="1" />
       <br />
       <button type="button" id="guessBtn">Adivinar</button>
     </div>
@@ -185,6 +195,7 @@
       const standingsPanel = document.getElementById("standingsPanel");
       const standingsBody = document.getElementById("standingsBody");
       const waitPlayersMsg = document.getElementById("waitPlayersMsg");
+      const rangeInfo = document.getElementById("rangeInfo");
 
       const saved = localStorage.getItem("guessNick");
       if (saved) nick.value = saved;
@@ -222,6 +233,14 @@
       }
 
       function renderState(o) {
+        const r = o.range;
+        if (r && typeof r.min === "number" && typeof r.max === "number") {
+          const span = r.max - r.min;
+          rangeInfo.textContent = `Esta ronda: del ${r.min} al ${r.max} (diferencia entre extremos: ${span}; hay ${span + 1} enteros posibles).`;
+          guessN.min = String(r.min);
+          guessN.max = String(r.max);
+        }
+
         const ready = Boolean(o.readyToPlay);
         waitPlayersMsg.style.display = joined && !ready ? "block" : "none";
         turnName.textContent = ready ? (o.currentTurnName ?? "—") : "—";

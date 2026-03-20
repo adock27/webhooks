@@ -2,8 +2,23 @@ import type { RawData } from "ws";
 import type { WebSocketServer } from "ws";
 import { WebSocket } from "ws";
 
-const RANGE = { min: 1, max: 100 } as const;
+/** Mínimo (max − min); el intervalo incluye al menos 101 enteros. */
+const MIN_RANGE_SPAN = 100;
+/** Amplitud aleatoria del rango en cada ronda. */
+const MAX_RANGE_SPAN = 5000;
+/** El máximo del rango no pasará de este valor. */
+const RANGE_CEILING = 100_000;
+
 const MIN_PLAYERS = 2;
+
+type GameRange = { min: number; max: number };
+
+function pickRandomRange(): GameRange {
+  const span = randomInt(MIN_RANGE_SPAN, MAX_RANGE_SPAN);
+  const min = randomInt(1, RANGE_CEILING - span);
+  const max = min + span;
+  return { min, max };
+}
 
 type Player = { ws: WebSocket; name: string };
 
@@ -19,8 +34,12 @@ function randomInt(a: number, b: number): number {
   return Math.floor(Math.random() * (b - a + 1)) + a;
 }
 
-function proximityPercent(guess: number, secret: number): number {
-  const span = RANGE.max - RANGE.min;
+function proximityPercent(
+  guess: number,
+  secret: number,
+  range: GameRange
+): number {
+  const span = range.max - range.min;
   if (span <= 0) return 100;
   const d = Math.abs(guess - secret);
   const raw = 100 * (1 - d / span);
@@ -67,7 +86,8 @@ function buildStandings(
 export function attachGuessGame(wss: WebSocketServer): void {
   const winsByName = new Map<string, number>();
 
-  let secret = randomInt(RANGE.min, RANGE.max);
+  let range = pickRandomRange();
+  let secret = randomInt(range.min, range.max);
   let players: Player[] = [];
   /** Índice en `players` del jugador con turno */
   let currentPlayerIndex = 0;
@@ -81,7 +101,8 @@ export function attachGuessGame(wss: WebSocketServer): void {
       clearTimeout(resetTimer);
       resetTimer = null;
     }
-    secret = randomInt(RANGE.min, RANGE.max);
+    range = pickRandomRange();
+    secret = randomInt(range.min, range.max);
     history = [];
     currentPlayerIndex = 0;
     won = false;
@@ -98,7 +119,7 @@ export function attachGuessGame(wss: WebSocketServer): void {
     const readyToPlay = players.length >= MIN_PLAYERS;
     const payload = JSON.stringify({
       type: "state",
-      range: RANGE,
+      range,
       players: players.map((p) => p.name),
       readyToPlay,
       currentTurnName: readyToPlay ? (cur?.name ?? null) : null,
@@ -202,8 +223,8 @@ export function attachGuessGame(wss: WebSocketServer): void {
         }
 
         const n = Number((data as { n?: unknown }).n);
-        if (!Number.isInteger(n) || n < RANGE.min || n > RANGE.max) {
-          sendError(socket, `El número debe ser entero entre ${RANGE.min} y ${RANGE.max}.`);
+        if (!Number.isInteger(n) || n < range.min || n > range.max) {
+          sendError(socket, `El número debe ser entero entre ${range.min} y ${range.max}.`);
           return;
         }
 
@@ -216,7 +237,7 @@ export function attachGuessGame(wss: WebSocketServer): void {
           result = "mayor";
         }
 
-        const proximityPct = proximityPercent(n, secret);
+        const proximityPct = proximityPercent(n, secret, range);
         history = [...history, { name: me.name, n, result, proximityPct }];
         won = result === "igual";
         if (won) {
