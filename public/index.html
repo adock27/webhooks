@@ -100,6 +100,17 @@
         color: #00ba7c;
         font-weight: 600;
       }
+      .wait-msg {
+        font-size: 0.9rem;
+        color: #e7a008;
+        margin-bottom: 0.75rem;
+      }
+      .dot-on {
+        color: #00ba7c;
+      }
+      .dot-off {
+        color: #71767b;
+      }
     </style>
   </head>
   <body>
@@ -115,13 +126,14 @@
     </div>
 
     <div class="panel" id="standingsPanel" style="display: none">
-      <strong>Tabla de posiciones</strong> (victorias en esta sesión del servidor)
+      <strong>Tabla de posiciones</strong> (victorias en esta sesión; “En línea” = conectado ahora)
       <table>
         <thead>
           <tr>
             <th>#</th>
             <th>Jugador</th>
             <th>Victorias</th>
+            <th>En línea</th>
           </tr>
         </thead>
         <tbody id="standingsBody"></tbody>
@@ -129,6 +141,9 @@
     </div>
 
     <div class="panel" id="playPanel" style="display: none">
+      <p id="waitPlayersMsg" class="wait-msg" style="display: none">
+        Esperando a que se una <strong>al menos otra persona</strong> para poder jugar.
+      </p>
       <p>
         <strong>Turno:</strong> <span id="turnName">—</span>
         <br />
@@ -169,6 +184,7 @@
       const histBody = document.getElementById("histBody");
       const standingsPanel = document.getElementById("standingsPanel");
       const standingsBody = document.getElementById("standingsBody");
+      const waitPlayersMsg = document.getElementById("waitPlayersMsg");
 
       const saved = localStorage.getItem("guessNick");
       if (saved) nick.value = saved;
@@ -206,7 +222,9 @@
       }
 
       function renderState(o) {
-        turnName.textContent = o.currentTurnName ?? "—";
+        const ready = Boolean(o.readyToPlay);
+        waitPlayersMsg.style.display = joined && !ready ? "block" : "none";
+        turnName.textContent = ready ? (o.currentTurnName ?? "—") : "—";
         playerList.textContent = Array.isArray(o.players) ? o.players.join(", ") : "—";
 
         const st = Array.isArray(o.standings) ? o.standings : [];
@@ -215,7 +233,11 @@
           standingsPanel.style.display = "block";
           for (const row of st) {
             const tr = document.createElement("tr");
-            tr.innerHTML = `<td>${row.rank}</td><td>${escapeHtml(row.name)}</td><td>${row.wins}</td>`;
+            const on = row.online === true;
+            const lineCell = on
+              ? `<span class="dot-on" title="Conectado">●</span> Sí`
+              : `<span class="dot-off" title="Desconectado">●</span> No`;
+            tr.innerHTML = `<td>${row.rank}</td><td>${escapeHtml(row.name)}</td><td>${row.wins}</td><td>${lineCell}</td>`;
             standingsBody.appendChild(tr);
           }
         } else {
@@ -250,11 +272,12 @@
 
         const canPlay =
           joined &&
+          ready &&
           !o.won &&
           myName &&
           o.currentTurnName === myName;
         guessBtn.disabled = !canPlay;
-        guessN.disabled = !joined || o.won;
+        guessN.disabled = !joined || o.won || !ready;
       }
 
       function escapeHtml(s) {

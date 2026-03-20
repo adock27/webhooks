@@ -3,6 +3,7 @@ import type { WebSocketServer } from "ws";
 import { WebSocket } from "ws";
 
 const RANGE = { min: 1, max: 100 } as const;
+const MIN_PLAYERS = 2;
 
 type Player = { ws: WebSocket; name: string };
 
@@ -26,12 +27,19 @@ function proximityPercent(guess: number, secret: number): number {
   return Math.max(0, Math.min(100, Math.round(raw)));
 }
 
-type StandingRow = { rank: number; name: string; wins: number };
+type StandingRow = {
+  rank: number;
+  name: string;
+  wins: number;
+  /** Hay al menos un socket en partida con este nombre. */
+  online: boolean;
+};
 
 function buildStandings(
   winsByName: Map<string, number>,
   connectedNames: string[]
 ): StandingRow[] {
+  const online = new Set(connectedNames);
   const names = new Set<string>([...winsByName.keys(), ...connectedNames]);
   const rows = [...names].map((name) => ({
     name,
@@ -45,7 +53,13 @@ function buildStandings(
     if (i > 0 && rows[i].wins !== rows[i - 1].wins) {
       rank = i + 1;
     }
-    out.push({ rank, name: rows[i].name, wins: rows[i].wins });
+    const name = rows[i].name;
+    out.push({
+      rank,
+      name,
+      wins: rows[i].wins,
+      online: online.has(name),
+    });
   }
   return out;
 }
@@ -81,11 +95,13 @@ export function attachGuessGame(wss: WebSocketServer): void {
       winsByName,
       players.map((p) => p.name)
     );
+    const readyToPlay = players.length >= MIN_PLAYERS;
     const payload = JSON.stringify({
       type: "state",
       range: RANGE,
       players: players.map((p) => p.name),
-      currentTurnName: cur?.name ?? null,
+      readyToPlay,
+      currentTurnName: readyToPlay ? (cur?.name ?? null) : null,
       history,
       won,
       winName,
@@ -168,6 +184,13 @@ export function attachGuessGame(wss: WebSocketServer): void {
       }
 
       if (t === "guess") {
+        if (players.length < MIN_PLAYERS) {
+          sendError(
+            socket,
+            `Hace falta al menos ${MIN_PLAYERS} jugadores conectados para jugar.`
+          );
+          return;
+        }
         if (won) {
           sendError(socket, "La ronda terminó; espera la siguiente.");
           return;
