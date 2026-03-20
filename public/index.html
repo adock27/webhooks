@@ -114,6 +114,20 @@
       <button type="button" id="joinBtn">Unirme a la partida</button>
     </div>
 
+    <div class="panel" id="standingsPanel" style="display: none">
+      <strong>Tabla de posiciones</strong> (victorias en esta sesión del servidor)
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Jugador</th>
+            <th>Victorias</th>
+          </tr>
+        </thead>
+        <tbody id="standingsBody"></tbody>
+      </table>
+    </div>
+
     <div class="panel" id="playPanel" style="display: none">
       <p>
         <strong>Turno:</strong> <span id="turnName">—</span>
@@ -127,13 +141,14 @@
     </div>
 
     <div class="panel">
-      <strong>Historial</strong> (todos ven si fue mayor o menor)
+      <strong>Historial</strong> (dirección y % de cercanía al número secreto, 100% = acierto)
       <table>
         <thead>
           <tr>
             <th>Quién</th>
             <th>Número</th>
             <th>Pista</th>
+            <th>Cerca</th>
           </tr>
         </thead>
         <tbody id="histBody"></tbody>
@@ -152,6 +167,8 @@
       const guessN = document.getElementById("guessN");
       const guessBtn = document.getElementById("guessBtn");
       const histBody = document.getElementById("histBody");
+      const standingsPanel = document.getElementById("standingsPanel");
+      const standingsBody = document.getElementById("standingsBody");
 
       const saved = localStorage.getItem("guessNick");
       if (saved) nick.value = saved;
@@ -192,6 +209,19 @@
         turnName.textContent = o.currentTurnName ?? "—";
         playerList.textContent = Array.isArray(o.players) ? o.players.join(", ") : "—";
 
+        const st = Array.isArray(o.standings) ? o.standings : [];
+        standingsBody.innerHTML = "";
+        if (st.length > 0) {
+          standingsPanel.style.display = "block";
+          for (const row of st) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${row.rank}</td><td>${escapeHtml(row.name)}</td><td>${row.wins}</td>`;
+            standingsBody.appendChild(tr);
+          }
+        } else {
+          standingsPanel.style.display = joined ? "block" : "none";
+        }
+
         histBody.innerHTML = "";
         for (const row of o.history || []) {
           const tr = document.createElement("tr");
@@ -207,7 +237,9 @@
               : row.result === "menor"
                 ? "hint-menor"
                 : "hint-igual";
-          tr.innerHTML = `<td>${escapeHtml(row.name)}</td><td>${row.n}</td><td class="${cls}">${hint}</td>`;
+          const pct =
+            typeof row.proximityPct === "number" ? `${row.proximityPct}%` : "—";
+          tr.innerHTML = `<td>${escapeHtml(row.name)}</td><td>${row.n}</td><td class="${cls}">${hint}</td><td>${pct}</td>`;
           histBody.appendChild(tr);
         }
 
@@ -272,6 +304,7 @@
         ws.send(JSON.stringify({ type: "join", name }));
         joined = true;
         joinPanel.style.display = "none";
+        standingsPanel.style.display = "block";
         playPanel.style.display = "block";
         statusEl.textContent = "En partida.";
         guessN.focus();

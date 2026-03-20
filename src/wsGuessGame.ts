@@ -10,13 +10,48 @@ type HistoryEntry = {
   name: string;
   n: number;
   result: "mayor" | "menor" | "igual";
+  /** 0–100: qué tan cerca está el intento del número secreto (misma escala para todos en el rango). */
+  proximityPct: number;
 };
 
 function randomInt(a: number, b: number): number {
   return Math.floor(Math.random() * (b - a + 1)) + a;
 }
 
+function proximityPercent(guess: number, secret: number): number {
+  const span = RANGE.max - RANGE.min;
+  if (span <= 0) return 100;
+  const d = Math.abs(guess - secret);
+  const raw = 100 * (1 - d / span);
+  return Math.max(0, Math.min(100, Math.round(raw)));
+}
+
+type StandingRow = { rank: number; name: string; wins: number };
+
+function buildStandings(
+  winsByName: Map<string, number>,
+  connectedNames: string[]
+): StandingRow[] {
+  const names = new Set<string>([...winsByName.keys(), ...connectedNames]);
+  const rows = [...names].map((name) => ({
+    name,
+    wins: winsByName.get(name) ?? 0,
+  }));
+  rows.sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name, "es"));
+
+  const out: StandingRow[] = [];
+  let rank = 1;
+  for (let i = 0; i < rows.length; i++) {
+    if (i > 0 && rows[i].wins !== rows[i - 1].wins) {
+      rank = i + 1;
+    }
+    out.push({ rank, name: rows[i].name, wins: rows[i].wins });
+  }
+  return out;
+}
+
 export function attachGuessGame(wss: WebSocketServer): void {
+  const winsByName = new Map<string, number>();
 
   let secret = randomInt(RANGE.min, RANGE.max);
   let players: Player[] = [];
@@ -42,6 +77,10 @@ export function attachGuessGame(wss: WebSocketServer): void {
 
   function broadcastState(extra?: { message?: string }) {
     const cur = players[currentPlayerIndex];
+    const standings = buildStandings(
+      winsByName,
+      players.map((p) => p.name)
+    );
     const payload = JSON.stringify({
       type: "state",
       range: RANGE,
@@ -50,6 +89,7 @@ export function attachGuessGame(wss: WebSocketServer): void {
       history,
       won,
       winName,
+      standings,
       ...extra,
     });
     for (const c of wss.clients) {
@@ -153,10 +193,12 @@ export function attachGuessGame(wss: WebSocketServer): void {
           result = "mayor";
         }
 
-        history = [...history, { name: me.name, n, result }];
+        const proximityPct = proximityPercent(n, secret);
+        history = [...history, { name: me.name, n, result, proximityPct }];
         won = result === "igual";
         if (won) {
           winName = me.name;
+          winsByName.set(me.name, (winsByName.get(me.name) ?? 0) + 1);
           broadcastState({
             message: `${me.name} acertó: ${n}. Nueva ronda en unos segundos…`,
           });
