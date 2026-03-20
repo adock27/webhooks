@@ -8,7 +8,11 @@ import { attachGuessGame } from "./wsGuessGame.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
 
-const basePort = Number(process.env.PORT) || 3000;
+const envPort = process.env.PORT;
+const basePort = Number(envPort) || 3000;
+/** En Railway/Heroku etc. PORT es fijo: no intentar otros puertos. */
+const portLocked = Boolean(envPort);
+const host = process.env.HOST ?? "0.0.0.0";
 const app = express();
 app.use(express.static(publicDir));
 
@@ -28,15 +32,15 @@ function listenFrom(port: number, attemptsLeft: number): void {
   const wssGame = new WebSocketServer({ server, path: "/ws/game" });
   attachGuessGame(wssGame);
 
-  server.listen(port, () => {
-    if (port !== basePort) {
+  server.listen(port, host, () => {
+    if (!portLocked && port !== basePort) {
       console.warn(`Puerto ${basePort} ocupado; usando ${port}.`);
     }
-    console.log(`Juego: http://127.0.0.1:${port}/`);
+    console.log(`Escuchando en http://${host}:${port}/`);
   });
 
   server.on("error", (err: NodeJS.ErrnoException) => {
-    if (err.code === "EADDRINUSE") {
+    if (err.code === "EADDRINUSE" && !portLocked) {
       console.warn(`Puerto ${port} en uso → probando ${port + 1}…`);
       server.close(() => {});
       listenFrom(port + 1, attemptsLeft - 1);
@@ -47,4 +51,4 @@ function listenFrom(port: number, attemptsLeft: number): void {
   });
 }
 
-listenFrom(basePort, 20);
+listenFrom(basePort, portLocked ? 1 : 20);
