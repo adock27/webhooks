@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+/* Tokens por tema: utilidades Tailwind leen --color-* → var(--c-*) */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
+  --color-app: var(--c-app);
+  --color-surface: var(--c-surface);
+  --color-surface-2: var(--c-surface-2);
+  --color-border: var(--c-border);
+  --color-muted: var(--c-muted);
+  --color-fg: var(--c-fg);
+  --color-accent: var(--c-accent);
+  --color-accent-hover: var(--c-accent-hover);
+  --color-accent-muted: var(--c-accent-muted);
+  --color-on-accent: var(--c-on-accent);
+  --color-success: var(--c-success);
+  --color-success-muted: var(--c-success-muted);
+  --color-warning: var(--c-warning);
+  --color-danger: var(--c-danger);
+  --color-danger-muted: var(--c-danger-muted);
+  --color-info-muted: var(--c-info-muted);
+}
+
+:root {
+  --c-app: #eef1f7;
+  --c-surface: #ffffff;
+  --c-surface-2: #e8ecf4;
+  --c-border: #c5cedd;
+  --c-muted: #5a6b82;
+  --c-fg: #111827;
+  --c-accent: #0d9488;
+  --c-accent-hover: #14b8a6;
+  --c-accent-muted: rgba(13, 148, 136, 0.14);
+  --c-on-accent: #042f2e;
+  --c-success: #16a34a;
+  --c-success-muted: rgba(22, 163, 74, 0.12);
+  --c-warning: #b45309;
+  --c-danger: #dc2626;
+  --c-danger-muted: rgba(220, 38, 38, 0.1);
+  --c-info-muted: rgba(13, 148, 136, 0.12);
+}
+
+.dark {
+  --c-app: #0a0d12;
+  --c-surface: #121820;
+  --c-surface-2: #1a222d;
+  --c-border: #2d3d52;
+  --c-muted: #8b9cb8;
+  --c-fg: #f0f4f8;
+  --c-accent: #22d3ee;
+  --c-accent-hover: #67e8f9;
+  --c-accent-muted: rgba(34, 211, 238, 0.15);
+  --c-on-accent: #051014;
+  --c-success: #4ade80;
+  --c-success-muted: rgba(74, 222, 128, 0.14);
+  --c-warning: #fbbf24;
+  --c-danger: #f87171;
+  --c-danger-muted: rgba(248, 113, 113, 0.14);
+  --c-info-muted: rgba(56, 189, 248, 0.14);
+}
+
+@layer base {
+  :root {
+    font-family: var(--font-sans);
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+  body {
+    @apply m-0 min-h-dvh bg-app text-fg antialiased;
+  }
+  :where(button, [href], input, select, textarea, summary):focus {
+    outline: none;
+  }
+  :where(button, [href], input, select, textarea, summary):focus-visible {
+    @apply z-10 rounded-md ring-2 ring-accent ring-offset-2 ring-offset-app;
+  }
+}
+
+@keyframes winPop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+@layer utilities {
+  .animate-win-pop {
+    animation: winPop 0.6s ease;
+  }
+  .animate-row-in {
+    animation: rowIn 0.35s ease-out;
+  }
+  .animate-pulse-soft {
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-win-pop,
+  .animate-row-in,
+  .animate-pulse-soft {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,14 @@
+---
+description: Arquitectura y límites del monorepo guess-game
+alwaysApply: true
+---
+
+# Guess game — visión general
+
+- **Backend**: `src/` — Node, Express, `ws`. Entrada: `server.ts`.
+- **Frontend**: `client/src/` — React + Vite. Alias **`@shared`** → `src/shared` (tipos del protocolo).
+- **Contrato**: `src/shared/protocol.ts` — tipos compartidos; **sin** imports de `fs`, `express` ni React.
+
+Al añadir campos al estado del juego: actualizar **protocol**, **servidor** (`guessGameAttachment` + lógica en `game/` si aplica) y **cliente** (hook/componentes). Mantener mensajes WebSocket como JSON serializable.
+
+No mezclar lógica de juego dentro de componentes React: va en `src/game/` o en el handler WS.

@@ -1,24 +1,25 @@
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
-import express from "express";
 import { WebSocketServer } from "ws";
-import { attachGuessGame } from "./wsGuessGame.js";
+import { createExpressApp } from "./http/createApp.js";
+import { attachGuessGame } from "./ws/guessGameAttachment.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
+const clientDist = path.join(__dirname, "..", "client", "dist");
+const staticRoot = fs.existsSync(path.join(clientDist, "index.html"))
+  ? clientDist
+  : publicDir;
 
 const envPort = process.env.PORT;
 const basePort = Number(envPort) || 3000;
 /** En Railway/Heroku etc. PORT es fijo: no intentar otros puertos. */
 const portLocked = Boolean(envPort);
 const host = process.env.HOST ?? "0.0.0.0";
-const app = express();
-app.use(express.static(publicDir));
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true });
-});
+const app = createExpressApp(staticRoot);
 
 function listenFrom(port: number, attemptsLeft: number): void {
   if (attemptsLeft <= 0) {

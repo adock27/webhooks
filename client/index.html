@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Juego multijugador por turnos: adivina el número secreto con pistas en tiempo real."
+    />
+    <meta name="theme-color" content="#eef1f7" />
+    <title>Adivina el número — juego en vivo</title>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("guess-theme") || "system";
+          var dark =
+            t === "dark" || (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", dark ? "#0a0d12" : "#eef1f7");
+        } catch (e) {
+          /* */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

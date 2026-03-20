@@ -1,0 +1,12 @@
+---
+description: Convenciones del servidor Node/TypeScript
+globs: src/**/*.ts
+alwaysApply: false
+---
+
+# Backend
+
+- Imports relativos con extensión **`.js`** en emits ESM (`from "./foo.js"`).
+- **Separación**: `game/` = puro y testeable; `ws/` = I/O y sesiones; `http/` = Express.
+- **Estado en memoria** documentado; persistencia futura vía interfaz, no `Map` globales sueltos en rutas HTTP.
+- Errores al cliente: `{ type: "error", message: string }` coherente con `protocol.ts`.

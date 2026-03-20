@@ -1,0 +1,12 @@
+---
+description: Convenciones React en client/
+globs: client/**/*.tsx
+alwaysApply: false
+---
+
+# Frontend React
+
+- **Un hook por feature** cuando concentre estado + efectos (p. ej. `useGuessGame`). Componentes **presentacionales** reciben props; sin `fetch`/WebSocket dentro de UI pura.
+- Tipos del servidor: **`import type { … } from "@shared/protocol"`** (no duplicar interfaces de mensajes).
+- **Tailwind CSS** (`@tailwindcss/vite`): utilidades en JSX; tokens en `@theme` apuntan a variables `--c-*` definidas en `:root` (claro) y `.dark` (oscuro). **Tema:** `useTheme` + `ThemeSwitcher`; preferencia en `localStorage` (`guess-theme`: `light` | `dark` | `system`). Script inline en `client/index.html` evita parpadeo al cargar. `@layer base` para `body`, foco visible y `prefers-reduced-motion`. Evitar estilos inline salvo valores dinámicos (`width`, etc.).
+- Nuevas pantallas: `client/src/features/<nombre>/` con `components/`, `hooks/`, y un contenedor que componga.

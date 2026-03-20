@@ -1,95 +1,20 @@
 import type { RawData } from "ws";
 import type { WebSocketServer } from "ws";
 import { WebSocket } from "ws";
-
-/** Mínimo (max − min); el intervalo incluye al menos 101 enteros. */
-const MIN_RANGE_SPAN = 100;
-/** Amplitud aleatoria del rango en cada ronda. */
-const MAX_RANGE_SPAN = 5000;
-/** El máximo del rango no pasará de este valor. */
-const RANGE_CEILING = 100_000;
-
-const MIN_PLAYERS = 2;
-
-type GameRange = { min: number; max: number };
-
-function pickRandomRange(): GameRange {
-  const span = randomInt(MIN_RANGE_SPAN, MAX_RANGE_SPAN);
-  const min = randomInt(1, RANGE_CEILING - span);
-  const max = min + span;
-  return { min, max };
-}
+import { MIN_PLAYERS, WIN_RESET_MS } from "../game/constants.js";
+import { proximityPercent } from "../game/proximity.js";
+import { pickRandomRange, randomInt } from "../game/randomRange.js";
+import { buildStandings } from "../game/standings.js";
+import type { GameRange, HistoryEntry } from "../shared/protocol.js";
 
 type Player = { ws: WebSocket; name: string };
-
-type HistoryEntry = {
-  name: string;
-  n: number;
-  result: "mayor" | "menor" | "igual";
-  /** 0–100: qué tan cerca está el intento del número secreto (misma escala para todos en el rango). */
-  proximityPct: number;
-};
-
-function randomInt(a: number, b: number): number {
-  return Math.floor(Math.random() * (b - a + 1)) + a;
-}
-
-function proximityPercent(
-  guess: number,
-  secret: number,
-  range: GameRange
-): number {
-  const span = range.max - range.min;
-  if (span <= 0) return 100;
-  const d = Math.abs(guess - secret);
-  const raw = 100 * (1 - d / span);
-  return Math.max(0, Math.min(100, Math.round(raw)));
-}
-
-type StandingRow = {
-  rank: number;
-  name: string;
-  wins: number;
-  /** Hay al menos un socket en partida con este nombre. */
-  online: boolean;
-};
-
-function buildStandings(
-  winsByName: Map<string, number>,
-  connectedNames: string[]
-): StandingRow[] {
-  const online = new Set(connectedNames);
-  const names = new Set<string>([...winsByName.keys(), ...connectedNames]);
-  const rows = [...names].map((name) => ({
-    name,
-    wins: winsByName.get(name) ?? 0,
-  }));
-  rows.sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name, "es"));
-
-  const out: StandingRow[] = [];
-  let rank = 1;
-  for (let i = 0; i < rows.length; i++) {
-    if (i > 0 && rows[i].wins !== rows[i - 1].wins) {
-      rank = i + 1;
-    }
-    const name = rows[i].name;
-    out.push({
-      rank,
-      name,
-      wins: rows[i].wins,
-      online: online.has(name),
-    });
-  }
-  return out;
-}
 
 export function attachGuessGame(wss: WebSocketServer): void {
   const winsByName = new Map<string, number>();
 
-  let range = pickRandomRange();
+  let range: GameRange = pickRandomRange();
   let secret = randomInt(range.min, range.max);
   let players: Player[] = [];
-  /** Índice en `players` del jugador con turno */
   let currentPlayerIndex = 0;
   let history: HistoryEntry[] = [];
   let won = false;
@@ -249,7 +174,7 @@ export function attachGuessGame(wss: WebSocketServer): void {
           resetTimer = setTimeout(() => {
             resetTimer = null;
             newRound("Nueva partida. El turno empieza por el primer jugador en la lista.");
-          }, 4500);
+          }, WIN_RESET_MS);
         } else {
           currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
           broadcastState();
