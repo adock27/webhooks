@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Adivina el número (por turnos)</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        background: #0f1419;
+        color: #e7e9ea;
+      }
+      body {
+        max-width: 560px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      h1 {
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+      .panel {
+        border: 1px solid #38444d;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 0.75rem;
+        background: #000;
+      }
+      label {
+        display: block;
+        font-size: 0.8rem;
+        color: #71767b;
+        margin-bottom: 0.25rem;
+      }
+      input[type="text"],
+      input[type="number"] {
+        width: 100%;
+        max-width: 280px;
+        padding: 0.5rem 0.65rem;
+        border-radius: 6px;
+        border: 1px solid #38444d;
+        background: #0f1419;
+        color: inherit;
+        box-sizing: border-box;
+      }
+      button {
+        margin-top: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        border: none;
+        background: #1d9bf0;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      #status {
+        font-size: 0.85rem;
+        color: #71767b;
+        margin-top: 0.5rem;
+      }
+      #banner {
+        margin-top: 0.5rem;
+        padding: 0.5rem 0.65rem;
+        border-radius: 6px;
+        background: #163018;
+        border: 1px solid #2f855a;
+        font-size: 0.9rem;
+        display: none;
+      }
+      #banner.show {
+        display: block;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.35rem 0.5rem;
+        border-bottom: 1px solid #38444d;
+      }
+      th {
+        color: #71767b;
+        font-weight: 600;
+      }
+      .hint-mayor {
+        color: #f4212e;
+      }
+      .hint-menor {
+        color: #1d9bf0;
+      }
+      .hint-igual {
+        color: #00ba7c;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Adivina el número (1–100)</h1>
+    <p id="status">Desconectado</p>
+    <div id="banner" role="status"></div>
+
+    <div class="panel" id="joinPanel">
+      <label for="nick">Tu nombre</label>
+      <input type="text" id="nick" maxlength="40" autocomplete="nickname" placeholder="ej. Ana" />
+      <br />
+      <button type="button" id="joinBtn">Unirme a la partida</button>
+    </div>
+
+    <div class="panel" id="playPanel" style="display: none">
+      <p>
+        <strong>Turno:</strong> <span id="turnName">—</span>
+        <br />
+        <strong>Jugadores:</strong> <span id="playerList">—</span>
+      </p>
+      <label for="guessN">Tu número</label>
+      <input type="number" id="guessN" min="1" max="100" step="1" />
+      <br />
+      <button type="button" id="guessBtn">Adivinar</button>
+    </div>
+
+    <div class="panel">
+      <strong>Historial</strong> (todos ven si fue mayor o menor)
+      <table>
+        <thead>
+          <tr>
+            <th>Quién</th>
+            <th>Número</th>
+            <th>Pista</th>
+          </tr>
+        </thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const banner = document.getElementById("banner");
+      const joinPanel = document.getElementById("joinPanel");
+      const playPanel = document.getElementById("playPanel");
+      const nick = document.getElementById("nick");
+      const joinBtn = document.getElementById("joinBtn");
+      const turnName = document.getElementById("turnName");
+      const playerList = document.getElementById("playerList");
+      const guessN = document.getElementById("guessN");
+      const guessBtn = document.getElementById("guessBtn");
+      const histBody = document.getElementById("histBody");
+
+      const saved = localStorage.getItem("guessNick");
+      if (saved) nick.value = saved;
+
+      const params = new URLSearchParams(location.search);
+      const hostFromQuery = params.get("host");
+      if (hostFromQuery) localStorage.setItem("devWsHost", hostFromQuery);
+
+      function wsHost() {
+        if (hostFromQuery) return hostFromQuery;
+        const s = localStorage.getItem("devWsHost");
+        if (s) return s;
+        if (location.host) {
+          if (location.port === "5500")
+            return `${location.hostname || "127.0.0.1"}:3000`;
+          return location.host;
+        }
+        return "127.0.0.1:3000";
+      }
+
+      function wsUrl(path) {
+        const proto = location.protocol === "https:" ? "wss:" : "ws:";
+        return `${proto}//${wsHost()}${path}`;
+      }
+
+      const gameWsUrl = wsUrl("/ws/game");
+      let ws = new WebSocket(gameWsUrl);
+
+      let myName = "";
+      let joined = false;
+
+      function setBanner(text, show) {
+        banner.textContent = text;
+        banner.classList.toggle("show", show);
+      }
+
+      function renderState(o) {
+        turnName.textContent = o.currentTurnName ?? "—";
+        playerList.textContent = Array.isArray(o.players) ? o.players.join(", ") : "—";
+
+        histBody.innerHTML = "";
+        for (const row of o.history || []) {
+          const tr = document.createElement("tr");
+          const hint =
+            row.result === "mayor"
+              ? "🔻"
+              : row.result === "menor"
+                ? "🔼"
+                : "¡Acertó!";
+          const cls =
+            row.result === "mayor"
+              ? "hint-mayor"
+              : row.result === "menor"
+                ? "hint-menor"
+                : "hint-igual";
+          tr.innerHTML = `<td>${escapeHtml(row.name)}</td><td>${row.n}</td><td class="${cls}">${hint}</td>`;
+          histBody.appendChild(tr);
+        }
+
+        if (o.message) setBanner(o.message, true);
+        else if (o.won && o.winName) {
+          setBanner(`Ganó ${o.winName}. Nueva ronda en breve…`, true);
+        } else setBanner("", false);
+
+        const canPlay =
+          joined &&
+          !o.won &&
+          myName &&
+          o.currentTurnName === myName;
+        guessBtn.disabled = !canPlay;
+        guessN.disabled = !joined || o.won;
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      ws.onopen = () => {
+        statusEl.textContent = "Conectado. Elige nombre y únete.";
+      };
+      ws.onclose = (ev) => {
+        joinBtn.disabled = true;
+        guessBtn.disabled = true;
+        const hint =
+          "¿npm run dev activo? Añade ?host=127.0.0.1:PUERTO si el servidor usa otro puerto.";
+        statusEl.textContent =
+          ev.wasClean || ev.code === 1000
+            ? "Desconectado. Recarga la página."
+            : `Desconectado (código ${ev.code}). ${hint} URL: ${gameWsUrl}`;
+      };
+      ws.onerror = () => {
+        statusEl.textContent = "Error WebSocket. Revisa servidor y " + gameWsUrl;
+      };
+
+      ws.onmessage = (ev) => {
+        let o;
+        try {
+          o = JSON.parse(ev.data);
+        } catch {
+          return;
+        }
+        if (o.type === "error") {
+          setBanner(o.message || "Error", true);
+          return;
+        }
+        if (o.type === "state") renderState(o);
+      };
+
+      joinBtn.addEventListener("click", () => {
+        const name = nick.value.trim().slice(0, 40);
+        if (!name || ws.readyState !== WebSocket.OPEN) return;
+        myName = name;
+        localStorage.setItem("guessNick", name);
+        ws.send(JSON.stringify({ type: "join", name }));
+        joined = true;
+        joinPanel.style.display = "none";
+        playPanel.style.display = "block";
+        statusEl.textContent = "En partida.";
+        guessN.focus();
+      });
+
+      guessBtn.addEventListener("click", () => {
+        const n = Number(guessN.value);
+        if (!Number.isInteger(n) || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: "guess", n }));
+      });
+    </script>
+  </body>
+</html>
