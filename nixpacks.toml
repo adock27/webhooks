@@ -1,0 +1,4 @@
+# Railway (Nixpacks): evita que npm omita devDependencies / opcionales durante `npm ci`
+# (Tailwind v4 necesita @tailwindcss/oxide-* en el build).
+[variables]
+NPM_CONFIG_PRODUCTION = "false"
